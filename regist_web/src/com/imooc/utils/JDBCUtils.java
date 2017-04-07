@@ -1,0 +1,214 @@
+package com.imooc.utils;
+
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.Statement;
+import java.util.logging.Logger;
+
+import javax.sql.DataSource;
+
+import org.apache.commons.dbutils.ResultSetHandler;
+
+
+public final class JDBCUtils {
+	
+    private static String driver = "com.mysql.jdbc.Driver";
+     private static String url = "jdbc:mysql://localhost:3306/regist_web";
+     private static String username = "root";
+     private static String password = "123456";
+     static {
+         try {
+             // 加载数据库驱动
+             Class.forName(driver);
+         } catch (Exception e) {
+             throw new ExceptionInInitializerError(e);
+         }
+     }
+ 
+     /**
+      * @Method: getConnection
+      * @Description: 获取数据库连接对象
+      * @Anthor:孤傲苍狼
+      *
+      * @return Connection数据库连接对象
+      * @throws SQLException
+      */
+     public static Connection getConnection() throws SQLException {
+         return DriverManager.getConnection(url, username, password);
+     }
+ 
+     /**
+      * @Method: release
+      * @Description: 释放资源， 要释放的资源包括Connection数据库连接对象，负责执行SQL命令的Statement对象，
+      *               存储查询结果的ResultSet对象
+      * @Anthor:孤傲苍狼
+      *
+      * @param conn
+      * @param st
+      * @param rs
+      */
+     public static void release(Connection conn, Statement st, ResultSet rs) {
+         if (rs != null) {
+             try {
+                 // 关闭存储查询结果的ResultSet对象
+                 rs.close();
+             } catch (Exception e) {
+                 e.printStackTrace();
+             }
+             rs = null;
+        }
+         if (st != null) {
+             try {
+                 // 关闭负责执行SQL命令的Statement对象
+                 st.close();
+             } catch (Exception e) {
+                 e.printStackTrace();
+             }
+         }
+ 
+         if (conn != null) {
+             try {
+                 // 关闭Connection数据库连接对象
+                 conn.close();
+             } catch (Exception e) {
+                 e.printStackTrace();
+             }
+         }
+     }
+ 
+     /**
+      * @Method: update
+      * @Description: 万能更新 所有实体的CUD操作代码基本相同，仅仅发送给数据库的SQL语句不同而已，
+      *               因此可以把CUD操作的所有相同代码抽取到工具类的一个update方法中，并定义参数接收变化的SQL语句
+      * @Anthor:孤傲苍狼
+      * @param sql
+      *            要执行的SQL
+      * @param params
+      *            执行SQL时使用的参数
+      * @throws SQLException
+      */
+     public static void update(String sql, Object params[]) throws SQLException {
+         Connection conn = null;
+         PreparedStatement st = null;
+         ResultSet rs = null;
+         try {
+             conn = getConnection();
+             st = conn.prepareStatement(sql);
+             for (int i = 0; i < params.length; i++) {
+                 st.setObject(i + 1, params[i]);
+             }
+             st.executeUpdate();
+ 
+         } finally {
+             release(conn, st, rs);
+         }
+     }
+ 
+     /**
+      * @Method: query
+      * @Description:万能查询 实体的R操作，除SQL语句不同之外，根据操作的实体不同，对ResultSet的映射也各不相同，
+      *                   因此可义一个query方法，除以参数形式接收变化的SQL语句外，
+      *                   可以使用策略模式由qurey方法的调用者决定如何把ResultSet中的数据映射到实体对象中。
+      * @Anthor:孤傲苍狼
+      *
+      * @param sql
+      *            要执行的SQL
+      * @param params
+      *            执行SQL时使用的参数
+      * @param rsh
+      *            查询返回的结果集处理器
+      * @return
+    * @throws SQLException
+      */
+   public static Object query(String sql, Object params[], ResultSetHandler rsh) throws SQLException {
+ 
+         Connection conn = null;
+         PreparedStatement st = null;
+         ResultSet rs = null;
+ 
+         try {
+             conn = getConnection();
+             st = conn.prepareStatement(sql);
+             for (int i = 0; i < params.length; i++) {
+                 st.setObject(i + 1, params[i]);
+             }
+             rs = st.executeQuery();
+             /**
+              * 对于查询返回的结果集处理使用到了策略模式，
+              * 在设计query方法时，query方法事先是无法知道用户对返回的查询结果集如何进行处理的，即不知道结果集的处理策略，
+              * 那么这个结果集的处理策略就让用户自己提供，query方法内部就调用用户提交的结果集处理策略进行处理
+              * 为了能够让用户提供结果集的处理策略，需要对用户暴露出一个结果集处理接口ResultSetHandler
+              * 用户只要实现了ResultSetHandler接口，那么query方法内部就知道用户要如何处理结果集了
+              */
+             return rsh.handle(rs);
+ 
+         } finally {
+             release(conn, st, rs);
+         }
+     }
+     
+     public static DataSource getDataSource(){
+         return new DataSource() {
+             
+             
+             @Override
+             public Connection getConnection(String username, String password) throws SQLException {
+                 
+                 return null;
+             }
+             
+             @Override
+             public Connection getConnection() throws SQLException {
+                 
+                 return JDBCUtils.getConnection();
+             }
+
+            @Override
+             public PrintWriter getLogWriter() throws SQLException {
+                 
+                 return null;
+             }
+ 
+             @Override
+             public int getLoginTimeout() throws SQLException {
+                
+                 return 0;
+             }
+ 
+             @Override
+             public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+                 
+                 return null;
+             }
+ 
+             @Override
+             public void setLogWriter(PrintWriter out) throws SQLException {
+                 
+                 
+             }
+ 
+             @Override
+             public void setLoginTimeout(int seconds) throws SQLException {
+                 
+                 
+             }
+ 
+             @Override
+             public boolean isWrapperFor(Class<?> iface) throws SQLException {
+                 
+                 return false;
+             }
+ 
+             @Override
+             public <T> T unwrap(Class<T> iface) throws SQLException {
+                 
+                 return null;
+             }
+         };
+     }
+}
